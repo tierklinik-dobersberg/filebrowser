@@ -4,6 +4,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,7 +46,7 @@ func previewHandler(imgSvc ImgService, fileCache FileCache, enableThumbnails, re
 			return http.StatusBadRequest, err
 		}
 
-		file, err := files.NewFileInfo(files.FileOptions{
+		file, err := files.NewFileInfo(&files.FileOptions{
 			Fs:         d.user.Fs,
 			Path:       "/" + vars["path"],
 			Modify:     d.user.Perm.Modify,
@@ -84,14 +85,14 @@ func handleImagePreview(
 
 	format, err := imgSvc.FormatFromExtension(file.Extension)
 	// Unsupported extensions directly return the raw data
-	if err == img.ErrUnsupportedFormat || format == img.FormatGif {
+	if errors.Is(err, img.ErrUnsupportedFormat) || format == img.FormatGif {
 		return rawFileHandler(w, r, file)
 	}
 	if err != nil {
 		return errToStatus(err), err
 	}
 
-	cacheKey := previewCacheKey(file.Path, file.ModTime.Unix(), previewSize)
+	cacheKey := previewCacheKey(file, previewSize)
 	resizedImage, ok, err := fileCache.Load(r.Context(), cacheKey)
 	if err != nil {
 		return errToStatus(err), err
@@ -129,8 +130,8 @@ func createPreview(imgSvc ImgService, fileCache FileCache,
 		height = 1080
 		options = append(options, img.WithMode(img.ResizeModeFit), img.WithQuality(img.QualityMedium))
 	case previewSize == PreviewSizeThumb:
-		width = 128
-		height = 128
+		width = 256
+		height = 256
 		options = append(options, img.WithMode(img.ResizeModeFill), img.WithQuality(img.QualityLow), img.WithFormat(img.FormatJpeg))
 	default:
 		return nil, img.ErrUnsupportedFormat
@@ -142,7 +143,7 @@ func createPreview(imgSvc ImgService, fileCache FileCache,
 	}
 
 	go func() {
-		cacheKey := previewCacheKey(file.Path, file.ModTime.Unix(), previewSize)
+		cacheKey := previewCacheKey(file, previewSize)
 		if err := fileCache.Store(context.Background(), cacheKey, buf.Bytes()); err != nil {
 			fmt.Printf("failed to cache resized image: %v", err)
 		}
@@ -151,6 +152,6 @@ func createPreview(imgSvc ImgService, fileCache FileCache,
 	return buf.Bytes(), nil
 }
 
-func previewCacheKey(fPath string, fTime int64, previewSize PreviewSize) string {
-	return fmt.Sprintf("%x%x%x", fPath, fTime, previewSize)
+func previewCacheKey(f *files.FileInfo, previewSize PreviewSize) string {
+	return fmt.Sprintf("%x%x%x", f.RealPath(), f.ModTime.Unix(), previewSize)
 }

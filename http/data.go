@@ -49,7 +49,9 @@ func (d *data) Check(path string) bool {
 
 func handle(fn handleFunc, prefix string, store *storage.Storage, server *settings.Server) http.Handler {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		for k, v := range globalHeaders {
+			w.Header().Set(k, v)
+		}
 
 		settings, err := store.Settings.Get()
 		if err != nil {
@@ -64,14 +66,15 @@ func handle(fn handleFunc, prefix string, store *storage.Storage, server *settin
 			server:   server,
 		})
 
-		if status != 0 {
-			txt := http.StatusText(status)
-			http.Error(w, strconv.Itoa(status)+" "+txt, status)
-		}
-
 		if status >= 400 || err != nil {
 			clientIP := realip.FromRequest(r)
 			log.Printf("%s: %v %s %v", r.URL.Path, status, clientIP, err)
+		}
+
+		if status != 0 {
+			txt := http.StatusText(status)
+			http.Error(w, strconv.Itoa(status)+" "+txt, status)
+			return
 		}
 	})
 

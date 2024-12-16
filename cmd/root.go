@@ -3,8 +3,8 @@ package cmd
 import (
 	"crypto/tls"
 	"errors"
+	"io"
 	"io/fs"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -64,6 +64,7 @@ func addServerFlags(flags *pflag.FlagSet) {
 	flags.Uint32("socket-perm", 0666, "unix socket file permissions") //nolint:gomnd
 	flags.StringP("baseurl", "b", "", "base url")
 	flags.String("cache-dir", "", "file cache directory (disabled if empty)")
+	flags.String("token-expiration-time", "2h", "user session timeout")
 	flags.Int("img-processors", 4, "image processors count") //nolint:gomnd
 	flags.Bool("disable-thumbnails", false, "disable image thumbnails")
 	flags.Bool("disable-preview-resize", false, "disable resize of image previews")
@@ -75,7 +76,7 @@ var rootCmd = &cobra.Command{
 	Use:   "filebrowser",
 	Short: "A stylish web-based file browser",
 	Long: `File Browser CLI lets you create the database to use with File Browser,
-manage your users and all the configurations without acessing the
+manage your users and all the configurations without accessing the
 web interface.
 
 If you've never run File Browser, you'll need to have a database for
@@ -107,9 +108,9 @@ name in caps. So to set "database" via an env variable, you should
 set FB_DATABASE.
 
 Also, if the database path doesn't exist, File Browser will enter into
-the quick setup mode and a new database will be bootstraped and a new
+the quick setup mode and a new database will be bootstrapped and a new
 user created with the credentials from options "username" and "password".`,
-	Run: python(func(cmd *cobra.Command, args []string, d pythonData) {
+	Run: python(func(cmd *cobra.Command, _ []string, d pythonData) {
 		log.Println(cfgFile)
 
 		if !d.hadDB {
@@ -181,6 +182,7 @@ user created with the credentials from options "username" and "password".`,
 		defer listener.Close()
 
 		log.Println("Listening on", listener.Addr().String())
+		//nolint: gosec
 		if err := http.Serve(listener, handler); err != nil {
 			log.Fatal(err)
 		}
@@ -260,6 +262,10 @@ func getRunParams(flags *pflag.FlagSet, st *storage.Storage) *settings.Server {
 	_, disableExec := getParamB(flags, "disable-exec")
 	server.EnableExec = !disableExec
 
+	if val, set := getParamB(flags, "token-expiration-time"); set {
+		server.TokenExpirationTime = val
+	}
+
 	return server
 }
 
@@ -299,7 +305,7 @@ func setupLog(logMethod string) {
 	case "stderr":
 		log.SetOutput(os.Stderr)
 	case "":
-		log.SetOutput(ioutil.Discard)
+		log.SetOutput(io.Discard)
 	default:
 		log.SetOutput(&lumberjack.Logger{
 			Filename:   logMethod,
@@ -312,9 +318,10 @@ func setupLog(logMethod string) {
 
 func quickSetup(flags *pflag.FlagSet, d pythonData) {
 	set := &settings.Settings{
-		Key:           generateKey(),
-		Signup:        false,
-		CreateUserDir: false,
+		Key:              generateKey(),
+		Signup:           false,
+		CreateUserDir:    false,
+		UserHomeBasePath: settings.DefaultUsersHomeBasePath,
 		Defaults: settings.UserDefaults{
 			Scope:       ".",
 			Locale:      "en",
@@ -330,6 +337,15 @@ func quickSetup(flags *pflag.FlagSet, d pythonData) {
 				Download: true,
 			},
 		},
+		AuthMethod: "",
+		Branding:   settings.Branding{},
+		Tus: settings.Tus{
+			ChunkSize:  settings.DefaultTusChunkSize,
+			RetryCount: settings.DefaultTusRetryCount,
+		},
+		Commands: nil,
+		Shell:    nil,
+		Rules:    nil,
 	}
 
 	var err error
@@ -400,7 +416,8 @@ func initConfig() {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(v.ConfigParseError); ok {
+		var configParseError v.ConfigParseError
+		if errors.As(err, &configParseError) {
 			panic(err)
 		}
 		cfgFile = "No config file used"

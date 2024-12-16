@@ -1,8 +1,8 @@
 body {
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
   padding-top: 4em;
-  background-color: #fafafa;
-  color: #333333;
+  background: var(--background);
+  color: var(--textSecondary);
 }
 
 * {
@@ -13,7 +13,7 @@ body {
 *:hover,
 *:active,
 *:focus {
-  outline: 0
+  outline: 0;
 }
 
 a {
@@ -44,7 +44,7 @@ i.spin {
 }
 
 #app {
-  transition: .2s ease padding;
+  transition: 0.2s ease padding;
 }
 
 #app.multiple {
@@ -58,22 +58,31 @@ nav {
   left: 0;
 }
 
+html[dir="rtl"] nav {
+  left: initial;
+  right: 0;
+}
+
 nav .action {
   width: 100%;
   display: block;
   border-radius: 0;
   font-size: 1.1em;
-  padding: .5em;
+  padding: 0.5em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-nav>div {
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
+html[dir="rtl"] nav .action {
+  text-align: right;
 }
 
-nav .action>* {
+nav > div {
+  border-top: 1px solid var(--divider);
+}
+
+nav .action > * {
   vertical-align: middle;
 }
 
@@ -85,31 +94,42 @@ main {
 
 .breadcrumbs {
   height: 3em;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  background: var(--background);
+  border-bottom: 1px solid var(--divider);
 }
 
 .breadcrumbs span,
 .breadcrumbs {
   display: flex;
   align-items: center;
-  color: #6f6f6f;
+  color: var(--textPrimary);
 }
 
 .breadcrumbs a {
   color: inherit;
-  transition: .1s ease-in;
-  border-radius: .125em;
+  transition: 0.1s ease-in;
+  border-radius: 0.125em;
+}
+
+html[dir="rtl"] .breadcrumbs a {
+  transform: translateX(-16em);
 }
 
 .breadcrumbs a:hover {
-  background-color: rgba(0,0,0, 0.05);
+  background-color: var(--divider);
 }
 
 .breadcrumbs span a {
-  padding: .2em;
+  padding: 0.2em;
 }
 
-#progress {
+.files {
+  position: absolute;
+  bottom: 30px;
+  width: 100%;
+}
+
+.progress {
   position: fixed;
   top: 0;
   left: 0;
@@ -118,13 +138,47 @@ main {
   z-index: 9999999999;
 }
 
-#progress div {
+.progress div {
   height: 100%;
   background-color: #40c4ff;
   width: 0;
-  transition: .2s ease width;
+  transition: 0.2s ease width;
 }
 
 .break-word {
   word-break: break-all;
+}
+
+.vue-number-input > input {
+  background: var(--surfacePrimary) !important;
+  border-color: var(--surfaceSecondary) !important;
+  color: var(--textSecondary) !important;
+}
+
+.vue-number-input--small > input {
+  height: 1rem !important;
+  font-size: 1rem !important;
+}
+
+.vue-number-input :hover,
+.vue-number-input :focus {
+  border-color: var(--borderSecondary) !important;
+}
+
+.vue-number-input__button {
+  background: var(--surfacePrimary) !important;
+}
+
+.vue-number-input__button--minus,
+.vue-number-input__button--plus {
+  border-color: var(--surfaceSecondary) !important;
+}
+
+.vue-number-input__button::before,
+.vue-number-input__button::after {
+  background: var(--textSecondary) !important;
+}
+
+.vfm-modal {
+  z-index: 9999999 !important;
 }
